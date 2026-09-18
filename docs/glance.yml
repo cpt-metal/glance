@@ -8,6 +8,13 @@ pages:
           - type: calendar
             first-day-of-week: monday
 
+
+          - type: custom-api
+            title: Cron-Test
+            cache-cron: "*/2 * * * *"
+            template: |
+              <p>Updated: {{ now | formatTime "15:04" }}
+
           - type: rss
             limit: 10
             collapse-after: 3
