@@ -1,4 +1,4 @@
-project_name: glanceapp/glance
+project_name: cpt-metal/glance
 
 checksum:
   disable: true
