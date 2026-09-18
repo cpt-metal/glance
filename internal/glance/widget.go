@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	cron "github.com/robfig/cron/v3"
 )
 
 var widgetIDCounter atomic.Uint64
@@ -144,6 +146,7 @@ const (
 	cacheTypeInfinite cacheType = iota
 	cacheTypeDuration
 	cacheTypeOnTheHour
+	cacheTypeCron
 )
 
 type widgetBase struct {
@@ -155,6 +158,8 @@ type widgetBase struct {
 	HideHeader          bool             `yaml:"hide-header"`
 	CSSClass            string           `yaml:"css-class"`
 	CustomCacheDuration durationField    `yaml:"cache"`
+	CronExpr			string           `yaml:"cache-cron"`
+	cronSchedule  		cron.Schedule    `yaml:"-"`
 	ContentAvailable    bool             `yaml:"-"`
 	WIP                 bool             `yaml:"-"`
 	Error               error            `yaml:"-"`
@@ -274,6 +279,25 @@ func (w *widgetBase) withCacheOnTheHour() *widgetBase {
 	return w
 }
 
+func (w *widgetBase) withCacheCron(expr string) *widgetBase {
+    w.cacheType = cacheTypeCron
+    w.CronExpr = expr
+
+    if expr == "" {
+        return w
+    }
+
+    sched, err := cron.ParseStandard(expr)
+    if err != nil {
+        slog.Error("invalid cache-cron expression", "expr", expr, "err", err)
+        w.cacheType = cacheTypeDuration
+        return w
+    }
+
+    w.cronSchedule = sched
+    return w
+}
+
 func (w *widgetBase) withNotice(err error) *widgetBase {
 	w.Notice = err
 
@@ -327,15 +351,25 @@ func (w *widgetBase) canContinueUpdateAfterHandlingErr(err error) bool {
 func (w *widgetBase) getNextUpdateTime() time.Time {
 	now := time.Now()
 
-	if w.cacheType == cacheTypeDuration {
+	switch w.cacheType {
+	case cacheTypeDuration:
 		return now.Add(w.cacheDuration)
-	}
 
-	if w.cacheType == cacheTypeOnTheHour {
+	case cacheTypeOnTheHour:
 		return now.Add(time.Duration(
 			((60-now.Minute())*60)-now.Second(),
 		) * time.Second)
-	}
+	
+	case cacheTypeCron:
+        if w.cronSchedule == nil {
+            return now.Add(w.cacheDuration)
+        }
+        next := w.cronSchedule.Next(now)
+        if next.IsZero() {
+            return now.Add(w.cacheDuration)
+        }
+        return next
+    }
 
 	return time.Time{}
 }

@@ -53,30 +53,36 @@ type customAPIWidget struct {
 }
 
 func (widget *customAPIWidget) initialize() error {
-	widget.withTitle("Custom API").withCacheDuration(1 * time.Hour)
+    widget.withTitle("Custom API")
 
-	if err := widget.CustomAPIRequest.initialize(); err != nil {
-		return fmt.Errorf("initializing primary request: %v", err)
-	}
+    if widget.CronExpr != "" {
+        widget.withCacheCron(widget.CronExpr)
+    } else {
+        widget.withCacheDuration(1 * time.Hour)
+    }
 
-	for key := range widget.Subrequests {
-		if err := widget.Subrequests[key].initialize(); err != nil {
-			return fmt.Errorf("initializing subrequest %q: %v", key, err)
-		}
-	}
+    if err := widget.CustomAPIRequest.initialize(); err != nil {
+        return fmt.Errorf("initializing primary request: %v", err)
+    }
 
-	if widget.Template == "" {
-		return errors.New("template is required")
-	}
+    for key := range widget.Subrequests {
+        if err := widget.Subrequests[key].initialize(); err != nil {
+            return fmt.Errorf("initializing subrequest %q: %v", key, err)
+        }
+    }
 
-	compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs).Parse(widget.Template)
-	if err != nil {
-		return fmt.Errorf("parsing template: %w", err)
-	}
+    if widget.Template == "" {
+        return errors.New("template is required")
+    }
 
-	widget.compiledTemplate = compiledTemplate
+    compiledTemplate, err := template.New("").Funcs(customAPITemplateFuncs).Parse(widget.Template)
+    if err != nil {
+        return fmt.Errorf("parsing template: %w", err)
+    }
 
-	return nil
+    widget.compiledTemplate = compiledTemplate
+
+    return nil
 }
 
 func (widget *customAPIWidget) update(ctx context.Context) {
