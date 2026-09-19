@@ -138,6 +138,11 @@ type rssFeedRequest struct {
 	ThumbnailLinkPrefix string            `yaml:"thumbnail-link-prefix"`
 	Headers             map[string]string `yaml:"headers"`
 	IsDetailed          bool              `yaml:"-"`
+	ExcludeFilters	    []rssExcludeFilter	`yaml:"filters"`
+}
+
+type rssExcludeFilter struct {
+	Filter		string	`yaml:"filter"`
 }
 
 type rssFeedItemList []rssFeedItem
@@ -345,6 +350,24 @@ func (widget *rssWidget) fetchItemsFromFeedTask(request rssFeedRequest) ([]rssFe
 		} else {
 			rssItem.PublishedAt = time.Now()
 		}
+
+		if len(request.ExcludeFilters) > 0 {
+			excluded := false
+
+			for _, filter := range request.ExcludeFilters {
+				if strings.Contains(item.Title, filter.Filter) {
+					excluded = true
+					break
+				}
+			}
+
+			if excluded {
+				continue
+			}
+			
+			slog.Debug("Feed filters", "filters", request.ExcludeFilters)
+		}
+
 
 		items = append(items, rssItem)
 	}
